@@ -26,32 +26,60 @@ if(a.scoringType==='Đối kháng')return (b.matches?b.wins/b.matches:0)-(a.matc
 return (a.time??Infinity)-(b.time??Infinity);
 }
 function standings(arr){
-const groups=new Map();for(const d of arr){if(rankingMetric(d)==null)continue;let k=category(d);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(d);}
+const groups=new Map();
+for(const d of arr){if(rankingMetric(d)==null)continue;let k=category(d);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(d);}
 const output=[];
 for(const [key,records] of groups){
-const best=new Map();
-for(const d of records){let before=best.get(d.team);if(!before||rankingCompare(d,before)<0)best.set(d.team,d)}
-const sorted=[...best.values()].sort(rankingCompare),total=sorted.length;
-for(const d of sorted){
-const rank=1+sorted.filter(x=>rankingCompare(x,d)<0).length;
-const beaten=sorted.filter(x=>rankingCompare(d,x)<0).length;
-const topPct=100*rank/total;
-const level=topPct<=10?'Top 10%':topPct<=25?'Top 25%':topPct<=50?'Top 50%':'Nửa sau';
-output.push({name:d.team,key,row:d,rank,total,beatenPct:total>1?100*beaten/(total-1):0,topPct,level,score:rankingMetric(d),leader:sorted[0].team,gap:Math.max(0,rankingMetric(sorted[0])-rankingMetric(d)),unit:d.scoringType==='Đối kháng'?'MP/trận':'điểm',isV:isV(d),attempts:records.filter(x=>x.team===d.team).length});
+const byTeam=new Map();
+for(const d of records){if(!byTeam.has(d.team))byTeam.set(d.team,[]);byTeam.get(d.team).push(d);}
+const entries=[...byTeam].map(([name,attempts])=>{
+  const first=attempts[0],points=attempts.map(rankingMetric).filter(x=>x!=null);
+  const timings=attempts.map(d=>d.time).filter(x=>x!=null);
+  const winRates=attempts.filter(d=>d.matches>0).map(d=>d.wins/d.matches);
+  return {name,key,row:first,attempts:attempts.length,hosts:uniq(attempts.map(x=>x.host)),
+    metric:avg(points),rawScoreAvg:avg(attempts.map(d=>d.score)),averageTime:avg(timings),
+    winRate:avg(winRates),isV:isV(first),unit:first.scoringType==='Đối kháng'?'MP/trận':'điểm'};
+}).filter(x=>x.metric!=null);
+const compare=(a,b)=>b.metric-a.metric||
+  (a.row.scoringType==='Đối kháng'?(b.winRate??0)-(a.winRate??0):(a.averageTime??Infinity)-(b.averageTime??Infinity));
+entries.sort(compare);
+for(const e of entries){
+  const rank=1+entries.filter(other=>compare(other,e)<-1e-9).length;
+  const beaten=entries.filter(other=>compare(e,other)<-1e-9).length;
+  const total=entries.length,topPct=100*rank/total;
+  const level=topPct<=10?'Top 10%':topPct<=25?'Top 25%':topPct<=50?'Top 50%':'Nửa sau';
+  output.push({name:e.name,key,row:e.row,rank,total,topPct,level,
+    beatenPct:total>1?100*beaten/(total-1):0,score:e.metric,
+    rawScoreAvg:e.rawScoreAvg,time:e.averageTime,leader:entries[0].name,
+    gap:Math.max(0,entries[0].metric-e.metric),unit:e.unit,isV:e.isV,
+    attempts:e.attempts,hosts:e.hosts});
 }
 }return output;
 }
 function bestStandings(rows){
-const names=new Map();
-for(const r of rows){const old=names.get(r.name);if(!old||r.topPct<old.topPct||(r.topPct===old.topPct&&r.rank<old.rank))names.set(r.name,r)}
-return [...names.values()].sort((a,b)=>a.topPct-b.topPct||a.rank-b.rank);
+// Một đội xuất hiện trong nhiều bảng: lấy trung bình có trọng số lượt thi
+// của chỉ số vị trí Top (%) sau khi tính trung bình điểm trong từng bảng.
+// Không chọn kết quả cao nhất; không so điểm thô khác bảng.
+const byName=new Map();
+for(const r of rows){if(!byName.has(r.name))byName.set(r.name,[]);byName.get(r.name).push(r);}
+return [...byName].map(([name,groups])=>{
+  const attempts=groups.reduce((t,g)=>t+g.attempts,0);
+  const topPct=groups.reduce((t,g)=>t+g.topPct*g.attempts,0)/attempts;
+  const raw=scope().filter(x=>x.team===name);
+  const types=uniq(raw.map(x=>x.scoringType));
+  const comparable=types.length===1;
+  return {...groups[0],topPct,level:topPct<=10?'Top 10%':topPct<=25?'Top 25%':topPct<=50?'Top 50%':'Nửa sau',
+    attempts,groupCount:groups.length,score:comparable?avg(raw.map(x=>x.score)):null,
+    unit:comparable?(types[0]==='Đối kháng'?'MP trung bình':'điểm TB'):'nhiều thang điểm',
+    key:groups.length===1?groups[0].key:'Tổng hợp '+groups.length+' bảng'};
+}).sort((a,b)=>a.topPct-b.topPct||a.name.localeCompare(b.name,'vi'));
 }
 function tier(r){
 const c=r.topPct<=10?'tier-best':r.topPct<=25?'tier-good':r.topPct<=50?'tier-mid':'tier-low';
 return `<span class="tier ${c}">${r.level}</span>`;
 }
 function rankProgress(r){return `<div class="rank-track" title="Thứ ${r.rank}/${r.total}"><span style="width:${Math.max(1,100-r.topPct)}%"></span></div>`;}
-function rankCard(r){return `<div class="rank-card"><div class="rank-caption">${esc(r.key)} · ${r.attempts} lượt thi</div><div class="rank-summary"><div class="rank-large"><small>HẠNG</small><strong>${r.rank}<em>/${r.total}</em></strong></div><div>${tier(r)}<p>Thuộc <b>Top ${fmt(r.topPct)}%</b> · xếp trên <b>${fmt(r.beatenPct)}%</b> đội khác</p>${rankProgress(r)}</div></div><div class="rank-meta"><span>Điểm tốt nhất <b>${fmt(r.score)} ${esc(r.unit)}</b></span><span>Kém đội đầu <b>${fmt(r.gap)} ${esc(r.unit)}</b></span></div></div>`;}
+function rankCard(r){return `<div class="rank-card"><div class="rank-caption">${esc(r.key)} · ${r.attempts} lần thi tính trung bình</div><div class="rank-summary"><div class="rank-large"><small>HẠNG</small><strong>${r.rank}<em>/${r.total}</em></strong></div><div>${tier(r)}<p>Thuộc <b>Top ${fmt(r.topPct)}%</b> · xếp trên <b>${fmt(r.beatenPct)}%</b> đội khác</p>${rankProgress(r)}</div></div><div class="rank-meta"><span>Điểm trung bình <b>${fmt(r.score)} ${esc(r.unit)}</b></span><span>Kém đội đầu <b>${fmt(r.gap)} ${esc(r.unit)}</b></span></div></div>`;}
 
 function mainRow(name,arr=scope()){let a=pointsForTeam(name,arr);return a.sort((a,b)=>(b.percentile??0)-(a.percentile??0))[0]||pointsForTeam(name)[0]||null;}
 function selectTeam(name,page='overview'){const d=mainRow(name,D);if(!d)return;S.selectedTeam=name;S.category=name==='V+ Wizards'?'all':category(d);S.host='all';S.page=page;S.search=name;render();}
