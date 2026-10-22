@@ -1,0 +1,53 @@
+name: Verify and deploy V+ Student Analytics
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JavaScript
+        run: node --check app.js
+      - name: Verify ENJOY AI dataset and team consolidation
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const {records} = JSON.parse(fs.readFileSync('data/results.json','utf8'));
+          const assert = (c, m) => { if (!c) throw new Error(m); };
+          assert(records.length === 653, 'Expected 653 valid results');
+          assert(new Set(records.map(x=>x.id)).size===653, 'Repeated record id');
+          assert(records.filter(x=>x.type==='V+').length===55,'Expected 55 V+ result rows');
+          assert(new Set(records.filter(x=>x.type==='V+').map(x=>x.team)).size===43,'Expected 43 V+ canonical team names');
+          const w=records.filter(x=>x.team==='V+ Wizards');
+          assert(w.length===3, 'V+ Wizards must be ONE team with THREE attempts');
+          assert(w.every(x=>x.type==='V+'),'V+ Wizards must be classified as V+');
+          assert(w.some(x=>x.rawTeam==='SMC-Wizards'),'Missing aliased SMC-Wizards result');
+          assert(new Set(w.map(x=>x.host)).size===3,'Wizards must have three different hosts');
+          assert(!records.some(x=>x.team==='SMC-Wizards'),'Alias must not appear as separate team');
+          assert(w.some(x=>x.group==='E')&&w.some(x=>x.group==='D'),'Preserve original contest categories');
+          console.log('Verified:', records.length, 'results;', w.length, 'attempts of 1 V+ Wizards team');
+          NODE
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
