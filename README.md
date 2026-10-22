@@ -21,7 +21,15 @@ Dashboard theo dõi năng lực thi đấu V+ STEAM LAB so với các đối th�
 | Enjoy AI Asian Open 2026 | Con đường phát minh, D | 720 | 257 | Giải Nhất |
 | Enjoy AI Đà Nẵng | Con đường phát minh, E | 800 | 210 | Giải Nhì |
 
-Cả ba kết quả đều được giữ; **không cộng thành 2.060 điểm thi**, vì chúng thuộc ba lượt thi và hai bảng đấu khác nhau. Hồ sơ đội hiển thị cả ba cùng với phân vị và thống kê mô tả, không tính thành ba đội độc lập.
+Cả ba kết quả được giữ trong **một đội V+ Wizards**. Quy tắc mới là **lấy trung bình cộng, không chọn điểm cao nhất**.
+
+- Điểm trung bình cả ba lần: **(540 + 720 + 800) / 3 = 686,67 điểm** (chỉ số mô tả tổng hợp).
+- **Bảng D:** 2 lần thi, trung bình **630 điểm**. Xếp hạng tham chiếu **9/77 đội**, thuộc **Top 11,69%** khi so với trung bình thành tích của tất cả đội cùng bảng.
+- **Bảng E:** 1 lần thi, trung bình **800 điểm**. Xếp hạng tham chiếu **2/49 đội**, thuộc **Top 4,08%**.
+- Vì hai bảng có thang điểm/điều kiện có thể khác nhau, **điểm trung bình tổng 686,67 không được dùng để xếp hạng chung tất cả đội khác bảng**.
+- Với các đội thi nhiều bảng, nhóm Top tổng hợp sử dụng trung bình vị trí tương đối có trọng số theo số lần thi của từng bảng.
+
+Cách đối chiếu: mỗi đội trong mỗi bảng chỉ xuất hiện một lần, điểm được tính `SUM(điểm các lượt hợp lệ cùng bảng) / số lượt hợp lệ`. Đối kháng dùng trung bình số Match Points/trận nếu số trận giữa các host khác nhau. Thứ hạng tại từng host do nguồn cung cấp vẫn được bảo toàn ở hồ sơ.
 
 ## Nguồn dữ liệu
 
