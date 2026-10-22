@@ -1,6 +1,6 @@
 
 'use strict';
-const S={page:'overview',category:'all',host:'all',selectedTeam:'',selectedRival:'',student:'',search:'',studentSearch:'',simScore:20,simTime:15,sort:'percentile',showAll:false};
+const S={page:'overview',category:'all',host:'all',selectedTeam:'',selectedRival:'',student:'',search:'',studentSearch:'',simScore:20,simTime:15,sort:'percentile',showAll:false,bucket:'all'};
 let D=[],students=new Map(),teams=[],hostList=[],categories=[];
 const $=q=>document.querySelector(q),fmt=x=>x==null||Number.isNaN(x)?'—':Number(x).toLocaleString('vi-VN',{maximumFractionDigits:2});
 const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
@@ -17,6 +17,42 @@ function scope(){return D.filter(d=>(S.category==='all'||category(d)===S.categor
 function pointsForTeam(n,arr=D){return arr.filter(d=>d.team===n);}
 function teamAggregate(n,arr=D){const a=pointsForTeam(n,arr),pct=a.map(d=>d.percentile).filter(v=>v!=null),ts=a.map(d=>d.time).filter(v=>v!=null);return {name:n,count:a.length,rows:a,percentile:avg(pct),score:avg(a.map(x=>x.score)),time:avg(ts),best:Math.max(...a.map(x=>x.percentile??0)),groups:uniq(a.map(category)),hosts:uniq(a.map(x=>x.host))};}
 function winners(arr){return uniq(arr.map(x=>x.team)).map(n=>teamAggregate(n,arr)).sort((a,b)=>(b.percentile??-1)-(a.percentile??-1));}
+
+function rankingMetric(d){return d.scoringType==='Đối kháng'?(d.matches?d.score/d.matches:null):d.score;}
+function rankingCompare(a,b){
+const x=rankingMetric(a),y=rankingMetric(b);if(x==null)return y==null?0:1;if(y==null)return -1;
+if(y!==x)return y-x;
+if(a.scoringType==='Đối kháng')return (b.matches?b.wins/b.matches:0)-(a.matches?a.wins/a.matches:0);
+return (a.time??Infinity)-(b.time??Infinity);
+}
+function standings(arr){
+const groups=new Map();for(const d of arr){if(rankingMetric(d)==null)continue;let k=category(d);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(d);}
+const output=[];
+for(const [key,records] of groups){
+const best=new Map();
+for(const d of records){let before=best.get(d.team);if(!before||rankingCompare(d,before)<0)best.set(d.team,d)}
+const sorted=[...best.values()].sort(rankingCompare),total=sorted.length;
+for(const d of sorted){
+const rank=1+sorted.filter(x=>rankingCompare(x,d)<0).length;
+const beaten=sorted.filter(x=>rankingCompare(d,x)<0).length;
+const topPct=100*rank/total;
+const level=topPct<=10?'Top 10%':topPct<=25?'Top 25%':topPct<=50?'Top 50%':'Nửa sau';
+output.push({name:d.team,key,row:d,rank,total,beatenPct:total>1?100*beaten/(total-1):0,topPct,level,score:rankingMetric(d),leader:sorted[0].team,gap:Math.max(0,rankingMetric(sorted[0])-rankingMetric(d)),unit:d.scoringType==='Đối kháng'?'MP/trận':'điểm',isV:isV(d),attempts:records.filter(x=>x.team===d.team).length});
+}
+}return output;
+}
+function bestStandings(rows){
+const names=new Map();
+for(const r of rows){const old=names.get(r.name);if(!old||r.topPct<old.topPct||(r.topPct===old.topPct&&r.rank<old.rank))names.set(r.name,r)}
+return [...names.values()].sort((a,b)=>a.topPct-b.topPct||a.rank-b.rank);
+}
+function tier(r){
+const c=r.topPct<=10?'tier-best':r.topPct<=25?'tier-good':r.topPct<=50?'tier-mid':'tier-low';
+return `<span class="tier ${c}">${r.level}</span>`;
+}
+function rankProgress(r){return `<div class="rank-track" title="Thứ ${r.rank}/${r.total}"><span style="width:${Math.max(1,100-r.topPct)}%"></span></div>`;}
+function rankCard(r){return `<div class="rank-card"><div class="rank-caption">${esc(r.key)} · ${r.attempts} lượt thi</div><div class="rank-summary"><div class="rank-large"><small>HẠNG</small><strong>${r.rank}<em>/${r.total}</em></strong></div><div>${tier(r)}<p>Thuộc <b>Top ${fmt(r.topPct)}%</b> · xếp trên <b>${fmt(r.beatenPct)}%</b> đội khác</p>${rankProgress(r)}</div></div><div class="rank-meta"><span>Điểm tốt nhất <b>${fmt(r.score)} ${esc(r.unit)}</b></span><span>Kém đội đầu <b>${fmt(r.gap)} ${esc(r.unit)}</b></span></div></div>`;}
+
 function mainRow(name,arr=scope()){let a=pointsForTeam(name,arr);return a.sort((a,b)=>(b.percentile??0)-(a.percentile??0))[0]||pointsForTeam(name)[0]||null;}
 function selectTeam(name,page='overview'){const d=mainRow(name,D);if(!d)return;S.selectedTeam=name;S.category=name==='V+ Wizards'?'all':category(d);S.host='all';S.page=page;S.search=name;render();}
 function selectRival(name){S.selectedRival=name;S.page='opponents';render();}
