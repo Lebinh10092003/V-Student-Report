@@ -12,7 +12,7 @@ const category=d=>d.event+' · Bảng '+d.group;
 const isV=d=>d.type==='V+';
 const uniq=x=>[...new Set(x)];
 const scoreMetric=d=>S.category==='all'?d.percentile:(d.scoringType==='Đối kháng'&&S.host==='all'&&d.matches?d.score/d.matches:d.score);
-const metricName=()=>S.category==='all'?'Phân vị trong host (%)':(S.host==='all'&&scope()[0]?.scoringType==='Đối kháng'?'Match Points / trận':'Điểm / Match Points');
+const metricName=()=>S.category==='all'?'Vị trí tổng hợp (100 - Top %), cao hơn tốt hơn':(S.host==='all'&&scope()[0]?.scoringType==='Đối kháng'?'Match Points / trận':'Điểm / Match Points');
 function scope(){return D.filter(d=>(S.category==='all'||category(d)===S.category)&&(S.host==='all'||d.host===S.host));}
 // Bảng xếp hạng luôn lấy tất cả host: chỉ lọc theo nội dung và bảng thi.
 function rankingScope(){return D.filter(d=>S.category==='all'||category(d)===S.category);}
@@ -104,12 +104,8 @@ function metric(k,v,h,accent=false){return `<div class="metric ${accent?'accent'
 function grid(svg,name){return `<div class="chart" role="img" aria-label="${esc(name)}">${svg}</div>`}
 function histogram(arr){let m;
 if(S.category==='all'){
-// Phân bố trung bình phân vị host: mỗi đội chỉ là một điểm, bất kể số lần thi.
-const names=uniq(arr.map(d=>d.team));
-m=names.map(name=>{
-const rows=arr.filter(d=>d.team===name),values=rows.map(d=>d.percentile).filter(x=>x!=null);
-return {team:name,type:rows[0].type,host:rows.length+' lần thi',x:avg(values)};
-}).filter(d=>d.x!=null);
+// Phân bố theo thứ hạng tổng hợp sau khi xếp riêng mỗi bảng trên toàn bộ host.
+m=bestStandings(standings(arr)).map(r=>({team:r.name,type:r.isV?'V+':'Đối thủ',host:r.attempts+' lần thi',x:100-r.topPct}));
 }else{
 // Phân bố điểm trung bình cộng từng đội trong cùng bảng, không chấm từng lượt.
 m=standings(arr).map(d=>({team:d.name,type:d.isV?'V+':'Đối thủ',host:d.attempts+' lần thi',x:d.score})).filter(d=>d.x!=null);
@@ -142,7 +138,7 @@ ${focus.length?`<section class="card" style="margin-bottom:17px"><div class="car
 <section class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Bảng xếp hạng V+ so với toàn giải</h2><p class="desc">Một dòng là một đội trong một bảng thi · Điểm = trung bình cộng mọi lần thi của đội trên <b>toàn bộ host</b> cùng bảng · Chọn đội để xem chi tiết.</p></div><button class="btn small" data-page="leaderboard">Xem toàn bộ đối thủ →</button></div><div class="rank-filters">${labels.map(([k,n])=>`<button data-bucket="${k}" class="filter-pill ${S.bucket===k?'active':''}">${n}</button>`).join('')}</div>
 <div class="table-scroll"><table class="ranking-table"><thead><tr><th>ĐỘI V+</th><th>NỘI DUNG · BẢNG</th><th>HẠNG TOÀN BẢNG</th><th>ĐỨNG TRÊN BAO NHIÊU ĐỘI?</th><th class="number">ĐIỂM TB</th><th class="number">CÁCH ĐỘI ĐẦU</th><th>NHÓM</th></tr></thead><tbody>
 ${rows.slice(0,S.showAll?999:20).map(x=>`<tr class="${x.name===S.selectedTeam?'hl':''}"><td><button class="team-rank-name" data-team="${esc(x.name)}">${esc(x.name)}</button><small class="rank-sub">${x.attempts} lần thi</small></td><td>${esc(x.key)}</td><td><div class="big-position">${x.rank}<em>/${x.total}</em></div><small class="rank-sub">Top ${fmt(x.topPct)}%</small></td><td><strong>${fmt(x.beatenPct)}%</strong><small class="rank-sub">số đội khác xếp sau</small>${rankProgress(x)}</td><td class="number">${fmt(x.score)}<small class="rank-sub">${esc(x.unit)}</small></td><td class="number">${fmt(x.gap)} ${esc(x.unit)}</td><td>${tier(x)}</td></tr>`).join('')}</tbody></table></div>${rows.length>20&&!S.showAll?`<button id="showAllRankings" class="btn" style="margin-top:14px">Xem toàn bộ ${rows.length} vị trí V+ →</button>`:''}
-</section><div class="cols"><section class="card"><h2>Phân bố điểm các đội</h2><p class="desc">Mỗi điểm V+ là trung bình các lần thi của đội trong bảng. Chọn một bảng để xem điểm trung bình thực tế; khi xem mọi bảng dùng phân vị.</p>${grid(histogram(filtered),'Phân bố điểm thi và vị trí V+')}</section><section class="card"><h2>Cách đọc các chỉ số</h2><div class="reading-guide"><p><b>Hạng 4/77:</b> đứng thứ 4 trong 77 đội duy nhất của bảng.</p><p><b>Top 5,2%:</b> 4 ÷ 77 × 100; càng thấp càng tốt.</p><p><b>Xếp trên 96%:</b> khoảng 96% các đội còn lại đứng sau.</p><p><b>Cách đội đầu 40 điểm:</b> cần thêm 40 điểm để bằng mức điểm dẫn đầu (chưa xét thời gian).</p></div><div class="insight warn">Xếp hạng toàn bảng dùng điểm trung bình cộng của mỗi đội từ <b>tất cả host</b> cùng bảng, bất kể bộ lọc host xem chi tiết. Đây là <strong>thứ hạng tham chiếu</strong>, không thay thế thứ hạng chính thức từng host. Với bảng đối kháng khác số trận, dùng MP/trận.</div></section></div>`;
+</section><div class="cols"><section class="card"><h2>Phân bố điểm các đội</h2><p class="desc">Mỗi điểm V+ là trung bình các lần thi của đội trong bảng. Chọn một bảng để xem điểm trung bình thực tế; khi xem mọi bảng dùng vị trí tổng hợp sau xếp hạng từng bảng.</p>${grid(histogram(filtered),'Phân bố điểm thi và vị trí V+')}</section><section class="card"><h2>Cách đọc các chỉ số</h2><div class="reading-guide"><p><b>Hạng 4/77:</b> đứng thứ 4 trong 77 đội duy nhất của bảng.</p><p><b>Top 5,2%:</b> 4 ÷ 77 × 100; càng thấp càng tốt.</p><p><b>Xếp trên 96%:</b> khoảng 96% các đội còn lại đứng sau.</p><p><b>Cách đội đầu 40 điểm:</b> cần thêm 40 điểm để bằng mức điểm dẫn đầu (chưa xét thời gian).</p></div><div class="insight warn">Xếp hạng toàn bảng dùng điểm trung bình cộng của mỗi đội từ <b>tất cả host</b> cùng bảng, bất kể bộ lọc host xem chi tiết. Đây là <strong>thứ hạng tham chiếu</strong>, không thay thế thứ hạng chính thức từng host. Với bảng đối kháng khác số trận, dùng MP/trận.</div></section></div>`;
 }
 function opponentsNear(row){if(!row)return [];let same=D.filter(d=>!isV(d)&&d.event===row.event&&d.group===row.group&&d.host===row.host);return same.sort((a,b)=>Math.abs(a.score-row.score)-Math.abs(b.score-row.score)).slice(0,6)}
 function percentileDiff(a,b){return (a??0)-(b??0);}
@@ -180,7 +176,18 @@ return `<div class="explainer"><div><span class="explainer-label">XẾP HẠNG T
 <div class="table-scroll"><table class="ranking-table"><thead><tr><th>HẠNG</th><th>TÊN ĐỘI</th><th class="number">ĐIỂM TB</th><th>VỊ TRÍ TRONG BẢNG</th><th class="number">CÁCH ĐỘI ĐẦU</th><th>CÁC HOST ĐÃ THI</th></tr></thead><tbody>${ranks.map(x=>`<tr class="${x.isV?'hl':''}"><td><b class="big-position">#${x.rank}<em>/${x.total}</em></b></td><td><button ${x.isV?`data-team="${esc(x.name)}"`:`data-rival="${esc(x.name)}"`} class="team-rank-name">${esc(x.name)}</button> ${x.isV?'<span class="chip vplus">V+</span>':''}</td><td class="number">${fmt(x.score)} ${esc(x.unit)}</td><td><b>Top ${fmt(x.topPct)}%</b>${rankProgress(x)}<small class="rank-sub">Xếp trên ${fmt(x.beatenPct)}% đội khác</small></td><td class="number">${fmt(x.gap)} ${esc(x.unit)}</td><td>${esc(x.hosts.join('; '))}</td></tr>`).join('')}</tbody></table></div></section>
 <div class="insight warn">Lưu ý: đây là bảng xếp hạng tham chiếu giữa các host, không thay thế kết quả chính thức riêng của từng host. Cùng nội dung/bảng chưa bảo đảm điều kiện thi hoàn toàn tương đồng.</div>`;
 }
-function teamsPage(){let a=scope().filter(isV),groups=winners(a),n=S.selectedTeam||groups[0]?.name||'';return `${metricCards(scope())}<div class="twocol"><section class="card"><h2>Danh sách đội V+</h2><p class="desc">Click để xem hồ sơ. V+ Wizards là một đội; điểm trung bình tính từ các lần thi trên mọi host trong cùng bảng.</p><div class="listpane">${groups.map(t=>`<div class="team-item ${n===t.name?'active':''}" data-team-profile="${esc(t.name)}"><strong>${esc(t.name)}</strong><small>${t.name==='V+ Wizards'?3:t.count} lần thi · phân vị TB ${fmt(t.name==='V+ Wizards'?teamAggregate(t.name).percentile:t.percentile)}% · ${esc(t.groups[0])}</small></div>`).join('')||'<div class="empty">Không có đội trong bộ lọc.</div>'}</div></section><section class="card">${detailTeam(n)}</section></div>`}
+function teamsPage(){
+const filtered=rankingScope(),positions=standings(filtered).filter(x=>x.isV),groups=bestStandings(positions);
+const n=S.selectedTeam&&groups.some(x=>x.name===S.selectedTeam)?S.selectedTeam:groups[0]?.name||'';
+const vRows=filtered.filter(isV);
+const cards=`<div class="easy-stats">${metric('SỐ ĐỘI V+',groups.length,'Tên đội không trùng lặp',true)}${metric('LƯỢT THI V+',vRows.length,'Gộp toàn bộ host theo bảng')}${metric('ĐỘI TOP 10% TB',groups.filter(x=>x.topPct<=10).length,'Trung bình vị trí theo số lần thi')}${metric('SỐ BẢNG V+ DỰ THI',uniq(vRows.map(category)).length,'Chấm điểm riêng theo bảng')}</div>`;
+return `${cards}<div class="twocol"><section class="card"><h2>Đội V+ · xếp theo vị trí trung bình</h2>
+<p class="desc">Đếm mỗi đội một lần; thứ hạng và điểm dùng trung bình các lần thi trên <b>tất cả host</b> của từng bảng. Tìm đội để xem bảng điểm riêng.</p>
+<div class="listpane">${groups.map(t=>`<div class="team-item ${n===t.name?'active':''}" data-team-profile="${esc(t.name)}">
+<strong>${esc(t.name)}</strong><small>${t.attempts} lần thi · Top TB ${fmt(t.topPct)}% · ${t.groupCount} bảng thi · ${t.score!=null?fmt(t.score)+' '+t.unit:'nhiều hệ thi'}</small>
+</div>`).join('')||'<div class="empty">Không có đội trong bộ lọc.</div>'}</div></section>
+<section class="card">${detailTeam(n)}</section></div>`;
+}
 function opponentPage(){let a=scope(),rivals=a.filter(x=>!isV(x)),all=winners(rivals),selected=S.selectedRival||all[0]?.name||'',r=mainRow(selected,rivals),v=a.filter(isV),vn=S.selectedTeam&&v.some(x=>x.team===S.selectedTeam)?S.selectedTeam:v[0]?.team||'',vr=mainRow(vn,v);
 const p=vr&&r&&vr.event===r.event&&vr.group===r.group&&vr.host===r.host;
 const comparable=p?`<div class="statline"><span>Điểm V+ (${esc(vn)})</span><strong>${fmt(vr.score)}</strong></div><div class="statline"><span>Điểm đối thủ (${esc(r.team)})</span><strong>${fmt(r.score)}</strong></div><div class="statline"><span>Chênh lệch điểm V+ − Đối thủ</span><strong>${fmt(vr.score-r.score)}</strong></div><div class="statline"><span>Chênh lệch thời gian</span><strong>${vr.time!=null&&r.time!=null?fmt(vr.time-r.time)+' giây':'—'}</strong></div>`: '<div class="insight warn">Chọn đối thủ cùng nội dung, bảng và host với đội V+ để so sánh điểm trực tiếp. Không so điểm thô khác bảng/host.</div>';
