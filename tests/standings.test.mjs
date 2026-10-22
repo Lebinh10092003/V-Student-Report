@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const js=readFileSync('app.js','utf8');
+const records=JSON.parse(readFileSync('data/results.json','utf8')).records;
+new Function(js); // JavaScript syntax test.
+const definitions=js.slice(0,js.lastIndexOf('init();'));
+const validate=new Function('records',definitions+`
+D=records;
+S.category='Con đường phát minh · Bảng D';S.host='all';
+const dBefore=standings(rankingScope()).find(r=>r.name==='V+ Wizards');
+const groupBefore=standings(rankingScope());
+S.host='Enjoy AI Hà Nội';
+const dAfter=standings(rankingScope()).find(r=>r.name==='V+ Wizards');
+const groupAfter=standings(rankingScope());
+S.category='Con đường phát minh · Bảng E';S.host='Enjoy AI Đà Nẵng';
+const eAfter=standings(rankingScope()).find(r=>r.name==='V+ Wizards');
+S.category='all';S.host='all';
+const overviewOk=overview().includes('toàn bộ host');
+return {dBefore,dAfter,eAfter,groupStable:JSON.stringify(groupBefore)===JSON.stringify(groupAfter),overviewOk};
+`);
+const a=validate(records);
+assert.equal(records.length,653,'Original 653 results must be preserved');
+assert.equal(a.groupStable,true,'Host selector must never alter cross-host standings');
+assert.equal(a.dBefore.score,630,'D score average must be (720+540)/2');
+assert.equal(a.dBefore.attempts,2,'D has two Wizards attempts across two hosts');
+assert.equal(a.dBefore.rank,9,'D Wizards average ranking should be 9/77');
+assert.equal(a.dBefore.total,77,'D unique teams across all hosts should be 77');
+assert.deepEqual(a.dBefore,a.dAfter,'Selecting Hanoi must not change D standings');
+assert.equal(a.eAfter.score,800,'E score should remain 800');
+assert.equal(a.eAfter.rank,2,'E Wizards ranking should be 2/49');
+assert.equal(a.eAfter.total,49);
+assert.equal(a.overviewOk,true);
+console.log('PASS: 653 records; V+ Wizards 1 team, D 630 pts (9/77), E 800 pts (2/49); cross-host invariant');
