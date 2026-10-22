@@ -17,6 +17,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate JavaScript
         run: node --check app.js
+      - name: Test all-host mean standings
+        run: node tests/standings.test.mjs
       - name: Verify ENJOY AI dataset and team consolidation
         shell: bash
         run: |
