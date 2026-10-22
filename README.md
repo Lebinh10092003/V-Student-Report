@@ -11,6 +11,15 @@ Dashboard theo dõi năng lực thi đấu V+ STEAM LAB so với các đối th�
 - **Kịch bản**: mô phỏng tăng điểm / giảm thời gian với đối thủ giữ nguyên, không phải dự báo giải thưởng.
 - **Dữ liệu**: 653 dòng kết quả chuẩn hóa; cho phép xuất CSV và in báo cáo PDF.
 
+## Nguyên tắc xếp hạng toàn bộ host
+
+- Bảng xếp hạng được phân nhóm theo **nội dung + bảng thi**, ví dụ `Con đường phát minh - D`.
+- Gom **tất cả host** (Hà Nội, Đà Nẵng, Asian Open, TP. HCM, v.v.) vào cùng một bảng thi khi nội dung/bảng tương ứng.
+- Mỗi đội chỉ xuất hiện **một lần trong một bảng**: điểm xếp hạng là **trung bình cộng tất cả kết quả cùng bảng trên toàn bộ host**.
+- Với bảng đối kháng có số trận khác nhau, so sánh bằng điểm trung bình mỗi trận (Match Points/trận).
+- **Bộ lọc host chỉ phục vụ xem dữ liệu từng host, không thay đổi thứ hạng toàn bộ host.**
+- Có bài kiểm thử `tests/standings.test.mjs` chạy trước mỗi lần GitHub Pages triển khai để đảm bảo logic này.
+
 ### Gộp V+ Wizards
 
 `SMC-Wizards` và `V+ Wizards` là **một đội duy nhất** với **ba lần dự thi**:
@@ -24,7 +33,7 @@ Dashboard theo dõi năng lực thi đấu V+ STEAM LAB so với các đối th�
 Cả ba kết quả được giữ trong **một đội V+ Wizards**. Quy tắc mới là **lấy trung bình cộng, không chọn điểm cao nhất**.
 
 - Điểm trung bình cả ba lần: **(540 + 720 + 800) / 3 = 686,67 điểm** (chỉ số mô tả tổng hợp).
-- **Bảng D:** 2 lần thi, trung bình **630 điểm**. Xếp hạng tham chiếu **9/77 đội**, thuộc **Top 11,69%** khi so với trung bình thành tích của tất cả đội cùng bảng.
+- **Bảng D:** 2 lần thi, trung bình **630 điểm**. Xếp hạng trung bình trên toàn bộ host **9/77 đội**, thuộc **Top 11,69%** khi so với trung bình thành tích của tất cả đội cùng bảng.
 - **Bảng E:** 1 lần thi, trung bình **800 điểm**. Xếp hạng tham chiếu **2/49 đội**, thuộc **Top 4,08%**.
 - Vì hai bảng có thang điểm/điều kiện có thể khác nhau, **điểm trung bình tổng 686,67 không được dùng để xếp hạng chung tất cả đội khác bảng**.
 - Với các đội thi nhiều bảng, nhóm Top tổng hợp sử dụng trung bình vị trí tương đối có trọng số theo số lần thi của từng bảng.
